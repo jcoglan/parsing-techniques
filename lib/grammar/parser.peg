@@ -1,0 +1,25 @@
+grammar Grammar.Parser
+
+rules         <-  _ (rule _)*                                   %build_grammar
+
+rule          <-  nonterminal _ ("→" / "->") _ expression       %build_rule
+
+expression    <-  choice / alternative
+
+choice        <-  alternative (_ "|" _ alternative)+            %build_choice
+
+alternative   <-  sequence / item
+
+sequence      <-  item (" "+ item)+                             %build_sequence
+
+item          <-  empty / nonterminal / terminal
+
+empty         <-  "ε"                                           %build_empty
+
+nonterminal   <-  [A-Z] name_chr*                               %build_nonterminal
+
+terminal      <-  name_chr+                                     %build_terminal
+
+name_chr      <-  [^\s|]
+
+_             <-  [\s]*
