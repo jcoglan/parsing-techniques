@@ -41,7 +41,7 @@ Grammar = Struct.new(:rules) do
     end
   end
 
-  class Empty
+  Empty = Class.new {
     include Enumerable
 
     def each
@@ -53,7 +53,7 @@ Grammar = Struct.new(:rules) do
     end
 
     alias :inspect :name
-  end
+  }.new
 
   NonTerminal = Struct.new(:name) do
     include Enumerable

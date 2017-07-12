@@ -20,7 +20,7 @@ class Grammar
     end
 
     def build_empty(*)
-      Empty.new
+      Empty
     end
 
     def build_nonterminal(t, a, b, *)
