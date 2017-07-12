@@ -1,4 +1,4 @@
-require 'tree'
+require 'grammar'
 
 class Unger
   def initialize(grammar)
