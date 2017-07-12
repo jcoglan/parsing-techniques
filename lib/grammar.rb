@@ -1,4 +1,5 @@
-require 'set'
+require_relative './algo'
+require_relative './tree'
 
 Grammar = Struct.new(:rules) do
   def self.parse(source)
@@ -111,7 +112,7 @@ Grammar = Struct.new(:rules) do
 
     rule_set = Set.new(rules)
 
-    productive_rules = closure(productive_rules) do |known, new|
+    productive_rules = Algo.closure(productive_rules) do |known, new|
       unknown = rule_set - known
 
       unknown.find_all do |rule|
@@ -133,27 +134,14 @@ Grammar = Struct.new(:rules) do
   end
 
   def remove_unreachable_nonterminals
-    reachable_terms = Set.new([start_symbol])
+    reachable_terms = [start_symbol]
 
-    reachable_terms = closure(reachable_terms) do |known, new|
+    reachable_terms = Algo.closure(reachable_terms) do |known, new|
       new.flat_map { |symbol| rules_for(symbol).flat_map(&:nonterminals) }
     end
 
-    reachable_rules = rules.find_all { |r| reachable_terms.member?(r.lhs) }
+    reachable_rules = rules.find_all { |rule| reachable_terms.member?(rule.lhs) }
     Grammar.new(reachable_rules)
-  end
-
-  def closure(match_set)
-    new_members = match_set
-
-    loop do
-      new_members = Set.new(yield match_set, new_members)
-      break if new_members.empty?
-
-      new_members -= match_set
-      match_set   += new_members
-    end
-    match_set
   end
 end
 
