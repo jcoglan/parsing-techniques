@@ -7,8 +7,9 @@ Grammar = Struct.new(:rules) do
   end
 
   Rule = Struct.new(:lhs, :rhs) do
-    def inspect
-      "#{lhs.name} → #{rhs.inspect}"
+    def inspect(width = nil)
+      padding = width ? width - lhs.name.size : 0
+      "#{lhs.name}#{' ' * padding} → #{rhs.inspect}"
     end
 
     def nonterminals
@@ -75,7 +76,8 @@ Grammar = Struct.new(:rules) do
   end
 
   def inspect
-    rules.map(&:inspect).join("\n")
+    width = rules.map { |rule| rule.lhs.name.size }.max
+    rules.map { |rule| rule.inspect(width) }.join("\n")
   end
 
   def start_symbol
