@@ -104,6 +104,19 @@ Grammar = Struct.new(:rules) do
     Grammar.new(split_rules)
   end
 
+  def join_choices
+    table = Hash.new { |h, k| h[k] = [] }
+
+    rules.each do |rule|
+      table[rule.lhs] << rule.rhs
+    end
+
+    new_rules = table.map do |key, rules|
+      Rule.new(key, rules.size == 1 ? rules.first : Choice.new(rules))
+    end
+    Grammar.new(new_rules)
+  end
+
   def clean
     remove_non_productive_rules.remove_unreachable_nonterminals
   end
