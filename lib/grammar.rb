@@ -159,8 +159,39 @@ Grammar = Struct.new(:rules) do
     Grammar.new(reachable_rules)
   end
 
-  def to_cnf
-    split_choices.remove_epsilon_rules.remove_unit_rules.clean
+  def to_cnf(prep = true)
+    if prep
+      return split_choices.remove_epsilon_rules.remove_unit_rules.clean.to_cnf(false)
+    end
+
+    term_index = split_index = 1
+
+    new_rules = rules.flat_map do |rule|
+      next [rule] if Terminal === rule.rhs
+
+      items = rule.rhs.items
+      rules = []
+
+      items = items.map do |item|
+        next item unless Terminal === item
+        symbol = NonTerminal.new("T#{term_index}")
+        term_index += 1
+        rules << Rule.new(symbol, item)
+        symbol
+      end
+
+      rest = items[0 ... -1].inject do |symbol, item|
+        lhs = NonTerminal.new("N#{split_index}")
+        split_index += 1
+        rules.unshift Rule.new(lhs, Sequence.new([symbol, item]))
+        lhs
+      end
+
+      rules.unshift Rule.new(rule.lhs, Sequence.new([rest, items.last]))
+      rules
+    end
+
+    Grammar.new(new_rules)
   end
 
   def remove_epsilon_rules

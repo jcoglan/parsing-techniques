@@ -65,4 +65,34 @@ describe Grammar do
       GMR
     end
   end
+
+  describe :to_cnf do
+    let(:grammar) do
+      Grammar.parse <<-GMR
+        Number   -> Integer | Real
+        Integer  -> Digit | Integer Digit
+        Real     -> Integer Fraction Scale
+        Fraction -> . Integer
+        Scale    -> e Sign Integer | Empty
+        Digit    -> 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+        Sign     -> + | -
+        Empty    -> ε
+      GMR
+    end
+
+    it 'converts a grammar to Chomsky normal form' do
+      grammar.to_cnf.join_choices.must_equal Grammar.parse(<<-GMR)
+        Number   -> 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | Integer Digit | N1 Scale' | Integer Fraction
+        N1       -> Integer Fraction
+        Integer  -> 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | Integer Digit
+        Fraction -> T1 Integer
+        T1       -> .
+        Digit    -> 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+        Sign     -> + | -
+        Scale'   -> N2 Integer
+        N2       -> T2 Sign
+        T2       -> e
+      GMR
+    end
+  end
 end
