@@ -12,6 +12,34 @@ Grammar = Struct.new(:rules) do
       "#{lhs.name}#{' ' * padding} → #{rhs.inspect}"
     end
 
+    def for?(symbol)
+      lhs == symbol
+    end
+
+    def is?(symbol)
+      rhs == symbol
+    end
+
+    def empty?
+      rhs == Empty
+    end
+
+    def unit?
+      NonTerminal === rhs
+    end
+
+    def sequence?
+      Sequence === rhs
+    end
+
+    def self_loop?
+      lhs == rhs
+    end
+
+    def contains?(symbol)
+      rhs.any? { |term| term == symbol }
+    end
+
     def nonterminals
       rhs.find_all { |item| NonTerminal === item }
     end
@@ -19,6 +47,10 @@ Grammar = Struct.new(:rules) do
 
   Choice = Struct.new(:items) do
     include Enumerable
+
+    def self.unit(items)
+      items.size == 1 ? items.first : Choice.new(items)
+    end
 
     def each(&block)
       items.each { |item| item.each(&block) }
@@ -32,12 +64,24 @@ Grammar = Struct.new(:rules) do
   Sequence = Struct.new(:items) do
     include Enumerable
 
+    def self.unit(items)
+      items.size == 1 ? items.first : new(items)
+    end
+
     def each(&block)
       items.each { |item| item.each(&block) }
     end
 
     def inspect
       items.map(&:inspect).join(' ')
+    end
+
+    def indexes(term)
+      items.each_index.find_all { |i| items[i] == term }
+    end
+
+    def replace(needle, replacement)
+      Sequence.new(items.map { |t| t == needle ? replacement : t })
     end
   end
 
@@ -53,6 +97,10 @@ Grammar = Struct.new(:rules) do
     end
 
     alias :inspect :name
+
+    def terminal?
+      true
+    end
   }.new
 
   NonTerminal = Struct.new(:name) do
@@ -63,6 +111,14 @@ Grammar = Struct.new(:rules) do
     end
 
     alias :inspect :name
+
+    def primed
+      NonTerminal.new(name + "'")
+    end
+
+    def terminal?
+      false
+    end
   end
 
   Terminal = Struct.new(:name) do
@@ -73,6 +129,10 @@ Grammar = Struct.new(:rules) do
     end
 
     alias :inspect :name
+
+    def terminal?
+      true
+    end
   end
 
   def inspect
@@ -106,14 +166,9 @@ Grammar = Struct.new(:rules) do
 
   def join_choices
     table = Hash.new { |h, k| h[k] = [] }
+    rules.each { |rule| table[rule.lhs] << rule.rhs }
 
-    rules.each do |rule|
-      table[rule.lhs] << rule.rhs
-    end
-
-    new_rules = table.map do |key, rules|
-      Rule.new(key, rules.size == 1 ? rules.first : Choice.new(rules))
-    end
+    new_rules = table.map { |key, rules| Rule.new(key, Choice.unit(rules)) }
     Grammar.new(new_rules)
   end
 
@@ -167,14 +222,14 @@ Grammar = Struct.new(:rules) do
     term_index = split_index = 1
 
     new_rules = rules.flat_map do |rule|
-      next [rule] if Terminal === rule.rhs
+      next [rule] unless rule.sequence?
 
       items       = rule.rhs.items
       term_rules  = []
       split_rules = []
 
       items = items.map do |item|
-        next item unless Terminal === item
+        next item unless item.terminal?
         lhs = NonTerminal.new("T#{term_index}")
         term_index += 1
         term_rules << Rule.new(lhs, item)
@@ -199,20 +254,20 @@ Grammar = Struct.new(:rules) do
     primes    = {}
     new_rules = rules
 
-    Algo.closure(find_empties(rules)) do |known, new|
+    Algo.closure(new_rules.find_all(&:empty?).map(&:lhs)) do |known, new|
       new_rules = new.inject(new_rules) do |rules, symbol|
-        primed = NonTerminal.new(symbol.name + "'")
+        primed = symbol.primed
         primes[symbol] = primed
 
         rules.flat_map do |rule|
           split_rule_on_empty(rule, symbol, primed)
         end
       end
-      find_empties(new_rules)
+      new_rules.find_all(&:empty?).map(&:lhs)
     end
 
     primed_rules = primes.flat_map do |from, to|
-      rules = new_rules.find_all { |rule| rule.lhs == from and rule.rhs != Empty }
+      rules = new_rules.reject(&:empty?).find_all { |rule| rule.for?(from) }
       rules.map { |rule| Rule.new(to, rule.rhs) }
     end
 
@@ -227,16 +282,16 @@ Grammar = Struct.new(:rules) do
   def remove_unit_rules
     new_rules = rules
 
-    Algo.closure(find_units(rules)) do |known, new|
+    Algo.closure(new_rules.find_all(&:unit?)) do |known, new|
       new_rules = new_rules.flat_map do |rule|
-        next [rule] if Sequence === rule.rhs or Terminal === rule.rhs
-        next [] if rule.lhs == rule.rhs
+        next [] if rule.self_loop?
+        next [rule] unless rule.unit?
 
-        new_rules.find_all { |r| r.lhs == rule.rhs }.map do |right|
+        new_rules.find_all { |r| r.for? rule.rhs }.map do |right|
           Rule.new(rule.lhs, right.rhs)
         end
       end
-      find_units(new_rules)
+      new_rules.find_all(&:unit?)
     end
 
     Grammar.new(new_rules)
@@ -244,31 +299,22 @@ Grammar = Struct.new(:rules) do
 
 private
 
-  def find_units(rules)
-    rules.reject { |rule| Sequence === rule.rhs }
-  end
-
-  def find_empties(rules)
-    rules.find_all { |rule| rule.rhs == Empty }.map(&:lhs)
-  end
-
   def split_rule_on_empty(rule, symbol, primed)
-    return [rule] unless rule.rhs.entries.include?(symbol)
+    return [rule] unless rule.contains?(symbol)
 
-    if rule.rhs == symbol
+    if rule.is? symbol
       return [primed, Empty].map { |rhs| Rule.new(rule.lhs, rhs) }
     end
 
     [].tap do |rules|
-      primed_items = rule.rhs.items.map { |t| t == symbol ? primed : t }
-      rules << Rule.new(rule.lhs, Sequence.new(primed_items))
+      seq = rule.rhs.replace(symbol, primed)
+      rules << Rule.new(rule.lhs, seq)
 
-      indexes = primed_items.each_index.find_all { |i| primed_items[i] == primed }
+      indexes = seq.indexes(primed)
 
       indexes.each do |index|
-        reduced = primed_items.take(index) + primed_items.drop(index + 1)
-        reduced = (reduced.size == 1) ? reduced.first : Sequence.new(reduced)
-        rules << Rule.new(rule.lhs, reduced)
+        reduced = seq.items.take(index) + seq.items.drop(index + 1)
+        rules << Rule.new(rule.lhs, Sequence.unit(reduced))
       end
     end
   end
