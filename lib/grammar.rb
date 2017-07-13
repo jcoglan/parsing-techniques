@@ -1,138 +1,15 @@
 require_relative './algo'
 require_relative './tree'
+require_relative './rule'
+require_relative './choice'
+require_relative './sequence'
+require_relative './empty'
+require_relative './non_terminal'
+require_relative './terminal'
 
 Grammar = Struct.new(:rules) do
   def self.parse(source)
     Grammar::Parser.parse(source, :actions => Grammar::Builder.new)
-  end
-
-  Rule = Struct.new(:lhs, :rhs) do
-    def inspect(width = nil)
-      padding = width ? width - lhs.name.size : 0
-      "#{lhs.name}#{' ' * padding} → #{rhs.inspect}"
-    end
-
-    def for?(symbol)
-      lhs == symbol
-    end
-
-    def is?(symbol)
-      rhs == symbol
-    end
-
-    def empty?
-      rhs == Empty
-    end
-
-    def unit?
-      NonTerminal === rhs
-    end
-
-    def sequence?
-      Sequence === rhs
-    end
-
-    def self_loop?
-      lhs == rhs
-    end
-
-    def contains?(symbol)
-      rhs.any? { |term| term == symbol }
-    end
-
-    def nonterminals
-      rhs.find_all { |item| NonTerminal === item }
-    end
-  end
-
-  Choice = Struct.new(:items) do
-    include Enumerable
-
-    def self.unit(items)
-      items.size == 1 ? items.first : Choice.new(items)
-    end
-
-    def each(&block)
-      items.each { |item| item.each(&block) }
-    end
-
-    def inspect
-      items.map(&:inspect).join(' | ')
-    end
-  end
-
-  Sequence = Struct.new(:items) do
-    include Enumerable
-
-    def self.unit(items)
-      items.size == 1 ? items.first : new(items)
-    end
-
-    def each(&block)
-      items.each { |item| item.each(&block) }
-    end
-
-    def inspect
-      items.map(&:inspect).join(' ')
-    end
-
-    def indexes(term)
-      items.each_index.find_all { |i| items[i] == term }
-    end
-
-    def replace(needle, replacement)
-      Sequence.new(items.map { |t| t == needle ? replacement : t })
-    end
-  end
-
-  Empty = Class.new {
-    include Enumerable
-
-    def each
-      yield self
-    end
-
-    def name
-      'ε'
-    end
-
-    alias :inspect :name
-
-    def terminal?
-      true
-    end
-  }.new
-
-  NonTerminal = Struct.new(:name) do
-    include Enumerable
-
-    def each
-      yield self
-    end
-
-    alias :inspect :name
-
-    def primed
-      NonTerminal.new(name + "'")
-    end
-
-    def terminal?
-      false
-    end
-  end
-
-  Terminal = Struct.new(:name) do
-    include Enumerable
-
-    def each
-      yield self
-    end
-
-    alias :inspect :name
-
-    def terminal?
-      true
-    end
   end
 
   def inspect
