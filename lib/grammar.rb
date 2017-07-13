@@ -169,26 +169,27 @@ Grammar = Struct.new(:rules) do
     new_rules = rules.flat_map do |rule|
       next [rule] if Terminal === rule.rhs
 
-      items = rule.rhs.items
-      rules = []
+      items       = rule.rhs.items
+      term_rules  = []
+      split_rules = []
 
       items = items.map do |item|
         next item unless Terminal === item
-        symbol = NonTerminal.new("T#{term_index}")
+        lhs = NonTerminal.new("T#{term_index}")
         term_index += 1
-        rules << Rule.new(symbol, item)
-        symbol
-      end
-
-      rest = items[0 ... -1].inject do |symbol, item|
-        lhs = NonTerminal.new("N#{split_index}")
-        split_index += 1
-        rules.unshift Rule.new(lhs, Sequence.new([symbol, item]))
+        term_rules << Rule.new(lhs, item)
         lhs
       end
 
-      rules.unshift Rule.new(rule.lhs, Sequence.new([rest, items.last]))
-      rules
+      prefix = items[0 ... -1].inject do |symbol, item|
+        lhs = NonTerminal.new("N#{split_index}")
+        split_index += 1
+        split_rules <<  Rule.new(lhs, Sequence.new([symbol, item]))
+        lhs
+      end
+
+      top = Rule.new(rule.lhs, Sequence.new([prefix, items.last]))
+      [top] + split_rules + term_rules
     end
 
     Grammar.new(new_rules)
