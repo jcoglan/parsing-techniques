@@ -77,7 +77,7 @@ Grammar = Struct.new(:rules) do
     end
 
     productive_rules &= rule_set
-    Grammar.new(productive_rules.to_a)
+    Grammar.new(productive_rules)
   end
 
   def remove_unreachable_nonterminals
@@ -148,7 +148,7 @@ Grammar = Struct.new(:rules) do
       rules.map { |rule| Rule.new(to, rule.rhs) }
     end
 
-    new_rules = Set.new(new_rules + primed_rules).entries
+    new_rules = Set.new(new_rules + primed_rules)
 
     unknown_keys = primes.values - primed_rules.map(&:lhs)
     new_rules.delete_if { |rule| unknown_keys.include? rule.rhs }
