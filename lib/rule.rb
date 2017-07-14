@@ -12,6 +12,10 @@ Rule = Struct.new(:lhs, :rhs) do
     rhs == symbol
   end
 
+  def contains?(symbol)
+    rhs.any? { |term| term == symbol }
+  end
+
   def empty?
     rhs == Empty
   end
@@ -28,8 +32,9 @@ Rule = Struct.new(:lhs, :rhs) do
     lhs == rhs
   end
 
-  def contains?(symbol)
-    rhs.any? { |term| term == symbol }
+  def match?(token)
+    value = (Terminal === rhs) ? rhs.name : rhs
+    value == token
   end
 
   def nonterminals
