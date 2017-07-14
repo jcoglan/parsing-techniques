@@ -14,4 +14,8 @@ module Algo
 
     match_set
   end
+
+  def self.product(a, b)
+    a.flat_map { |left| b.map { |right| yield left, right } }
+  end
 end
